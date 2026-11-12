@@ -89,7 +89,7 @@
     }
     .currency-filter select:focus { outline: none; border-color: #1a6b3c; }
 
-    #content { padding: 12px 16px; max-width: 700px; margin: 0 auto; }
+    #content { padding: 12px 16px 60px; max-width: 700px; margin: 0 auto; }
 
     .loading {
       text-align: center;
@@ -236,6 +236,7 @@
   <button class="nav-btn active" onclick="showPage('banks', this)">البنوك</button>
   <button class="nav-btn" onclick="showPage('gold', this)">الذهب</button>
   <button class="nav-btn" onclick="showPage('silver', this)">الفضة</button>
+  <button class="nav-btn" onclick="showPage('exchanges', this)">مكاتب الصرافة</button>
 </nav>
 
 <div class="currency-filter" id="filter-bar">
@@ -243,13 +244,12 @@
     <option value="">— كل العملات —</option>
   </select>
 </div>
-<div id="sort-bar" style="display:none;padding:8px 16px;background:#f8faf9;border-bottom:1px solid #e8e8e8;display:none;gap:8px;align-items:center;flex-wrap:wrap">
+<div id="sort-bar" style="display:none;padding:8px 16px;background:#f8faf9;border-bottom:1px solid #e8e8e8;gap:8px;align-items:center;flex-wrap:wrap">
   <span style="font-size:0.8rem;color:#666">ترتيب:</span>
-  <button class="sort-btn active" onclick="setSort('default',this)">افتراضي</button>
-  <button class="sort-btn" onclick="setSort('buy_asc',this)">شراء ↑</button>
-  <button class="sort-btn" onclick="setSort('buy_desc',this)">شراء ↓</button>
-  <button class="sort-btn" onclick="setSort('name',this)">الاسم</button>
-  <button class="sort-btn" onclick="setSort('updated',this)">الأحدث</button>
+  <button class="sort-btn active" onclick="setSort('buy_desc',this)">شراء أعلى</button>
+  <button class="sort-btn" onclick="setSort('buy_asc',this)">شراء أدنى</button>
+  <button class="sort-btn" onclick="setSort('sell_desc',this)">بيع أعلى</button>
+  <button class="sort-btn" onclick="setSort('sell_asc',this)">بيع أدنى</button>
 </div>
 
 <div id="content">
@@ -261,7 +261,7 @@ const DB = 'https://exchange-rates-project.firebaseio.com';
 let allData = {};
 let currentPage = 'banks';
 let currencyFilter = '';
-let sortMode = 'default';
+let sortMode = 'buy_desc';
 const STALE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
 function isStale(updatedMs) {
@@ -291,12 +291,13 @@ async function fetchJSON(url) {
 }
 
 async function loadAll() {
-  const [banks, currencies, prices, gold, silver] = await Promise.all([
+  const [banks, currencies, prices, gold, silver, exchanges] = await Promise.all([
     fetchJSON(`${DB}/banks.json`),
     fetchJSON(`${DB}/currencies.json`),
     fetchJSON(`${DB}/currencies-prices.json`),
     fetchJSON(`${DB}/gold-prices.json`),
-    fetchJSON(`${DB}/silver-prices.json`)
+    fetchJSON(`${DB}/silver-prices.json`),
+    fetchJSON(`${DB}/exchanges.json`)
   ]);
 
   // Normalize currencies: pushId → {currencyId, currencyName, currencyCode}
@@ -307,7 +308,7 @@ async function loadAll() {
     });
   }
 
-  allData = { banks, currMap, prices, gold, silver };
+  allData = { banks, currMap, prices, gold, silver, exchanges };
   populateCurrencySelect(currMap);
   renderPage();
   updateTimestamp();
@@ -340,7 +341,7 @@ function showPage(page, btn) {
   btn.classList.add('active');
   document.getElementById('filter-bar').style.display = page === 'banks' ? '' : 'none';
   currencyFilter = '';
-  sortMode = 'default';
+  sortMode = 'buy_desc';
   document.getElementById('currency-select').value = '';
   document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   updateSortBar();
@@ -349,6 +350,8 @@ function showPage(page, btn) {
 
 function filterCurrencies(val) {
   currencyFilter = val;
+  sortMode = 'buy_desc';
+  document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   updateSortBar();
   renderPage();
 }
@@ -367,6 +370,7 @@ function renderPage() {
   if (currentPage === 'banks') renderBanks(el);
   else if (currentPage === 'gold') renderGold(el, allData.gold);
   else if (currentPage === 'silver') renderSilver(el, allData.silver);
+  else if (currentPage === 'exchanges') renderExchanges(el, allData.exchanges);
 }
 
 function relativeTime(ms) {
@@ -411,10 +415,10 @@ function renderBanks(el) {
     });
 
     // Sort
-    if (sortMode === 'buy_asc')  entries.sort((a,b) => parseFloat(a.p.buy_price) - parseFloat(b.p.buy_price));
-    if (sortMode === 'buy_desc') entries.sort((a,b) => parseFloat(b.p.buy_price) - parseFloat(a.p.buy_price));
-    if (sortMode === 'name')     entries.sort((a,b) => a.bank.name.localeCompare(b.bank.name, 'ar'));
-    if (sortMode === 'updated')  entries.sort((a,b) => b.p.updated - a.p.updated);
+    if (sortMode === 'buy_asc')   entries.sort((a,b) => parseFloat(a.p.buy_price) - parseFloat(b.p.buy_price));
+    if (sortMode === 'buy_desc')  entries.sort((a,b) => parseFloat(b.p.buy_price) - parseFloat(a.p.buy_price));
+    if (sortMode === 'sell_asc')  entries.sort((a,b) => parseFloat(a.p.sell_price) - parseFloat(b.p.sell_price));
+    if (sortMode === 'sell_desc') entries.sort((a,b) => parseFloat(b.p.sell_price) - parseFloat(a.p.sell_price));
 
     const rows = entries.map(({ bank, p }) => {
       const icon = bank.icon
@@ -583,6 +587,51 @@ function renderSilver(el, data) {
       ${rows}${ounce}
     </div>
     ${updated ? `<div style="text-align:center;color:#aaa;font-size:0.75rem;padding:8px">آخر تحديث: ${updated}</div>` : ''}`;
+}
+
+function renderExchanges(el, data) {
+  if (!data) { el.innerHTML = '<div class="empty">لا توجد بيانات</div>'; return; }
+
+  const items = (Array.isArray(data) ? data : Object.values(data)).filter(Boolean);
+  const regions = ['الكل', ...new Set(items.map(x => x.region).filter(Boolean))].sort((a,b) =>
+    a === 'الكل' ? -1 : a.localeCompare(b, 'ar'));
+
+  // Store for filter
+  if (!el._region) el._region = 'الكل';
+
+  const filtered = el._region === 'الكل' ? items : items.filter(x => x.region === el._region);
+  filtered.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+
+  const regionTabs = regions.map(r => `
+    <button class="sort-btn ${r === el._region ? 'active' : ''}"
+      onclick="document.getElementById('content')._region='${r}';renderExchanges(document.getElementById('content'),window._exchangesData)"
+      style="margin:3px">${r}</button>`).join('');
+
+  const cards = filtered.map(x => {
+    const mapUrl = x.latitutde && x.longitude
+      ? `https://maps.google.com/?q=${x.latitutde},${x.longitude}`
+      : `https://maps.google.com/?q=${encodeURIComponent(x.name + ' ' + x.address)}`;
+    const phones = [x.phone1, x.phone2].filter(Boolean).map(p =>
+      `<a href="tel:${p}" style="color:#1a6b3c;text-decoration:none">${p}</a>`).join(' · ');
+    return `
+      <div class="bank-card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div>
+            <div class="currency-name" style="font-size:1rem">${x.name}</div>
+            <div style="font-size:0.78rem;color:#888;margin-top:3px">${x.address || ''}</div>
+            ${phones ? `<div style="font-size:0.82rem;margin-top:4px">${phones}</div>` : ''}
+          </div>
+          <a href="${mapUrl}" target="_blank" style="flex-shrink:0;background:#1a6b3c;color:white;padding:6px 10px;border-radius:8px;font-size:0.78rem;text-decoration:none">🗺 خريطة</a>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="padding:4px 0 8px;display:flex;flex-wrap:wrap;gap:4px">${regionTabs}</div>
+    <div style="font-size:0.78rem;color:#888;margin-bottom:8px">${filtered.length} مكتب</div>
+    ${cards || '<div class="empty">لا توجد نتائج</div>'}`;
+
+  window._exchangesData = data;
 }
 
 async function refreshData(btn) {
