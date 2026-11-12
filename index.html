@@ -320,7 +320,6 @@ function dirIcon(d) {
 function renderBanks(el) {
   const { banks, currMap, prices } = allData;
 
-  // banks is an array; each item has an internal .id field (not the array index)
   const bankList = (Array.isArray(banks) ? banks : Object.values(banks))
     .filter(Boolean)
     .sort((a, b) => a.id - b.id);
@@ -330,20 +329,54 @@ function renderBanks(el) {
     return;
   }
 
-  // prices[currencyId][bankId]
-  // Which currencies to show
-  const filteredCurrencies = currencyFilter
-    ? Object.entries(currMap).filter(([cid]) => cid === currencyFilter)
-    : Object.entries(currMap);
+  // Single currency selected → flat table of all banks
+  if (currencyFilter) {
+    const curr = currMap[currencyFilter];
+    if (!curr) { el.innerHTML = '<div class="empty">عملة غير موجودة</div>'; return; }
+    const currPrices = prices?.[parseInt(currencyFilter)];
 
+    let rows = '';
+    bankList.forEach(bank => {
+      const p = currPrices?.[bank.id];
+      if (!p) return;
+      const icon = bank.icon
+        ? `<img src="${bank.icon}" alt="" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-left:8px;" onerror="this.style.display='none'">`
+        : '';
+      rows += `
+        <div class="rate-row">
+          <div style="display:flex;align-items:center">${icon}<span class="currency-name">${bank.name}</span></div>
+          <div class="price-cell">
+            <span class="price-val">${p.buy_price?.toString().trim()}</span>
+            ${dirIcon(p.buy_direction)}
+          </div>
+          <div class="price-cell">
+            <span class="price-val">${p.sell_price?.toString().trim()}</span>
+            ${dirIcon(p.sell_direction)}
+          </div>
+        </div>`;
+    });
+
+    el.innerHTML = rows
+      ? `<div class="bank-card">
+           <div class="rate-row header">
+             <div>البنك</div>
+             <div style="text-align:center">شراء</div>
+             <div style="text-align:center">بيع</div>
+           </div>
+           ${rows}
+         </div>`
+      : '<div class="empty">لا توجد بيانات لهذه العملة</div>';
+    return;
+  }
+
+  // No filter → accordion cards per bank
   let html = '';
   bankList.forEach(bank => {
     let rows = '';
     let visibleCount = 0;
 
-    filteredCurrencies.forEach(([cid, curr]) => {
-      const currPrices = prices?.[parseInt(cid)];
-      const p = currPrices?.[bank.id];
+    Object.entries(currMap).forEach(([cid, curr]) => {
+      const p = prices?.[parseInt(cid)]?.[bank.id];
       if (!p) return;
       visibleCount++;
       rows += `
@@ -371,9 +404,7 @@ function renderBanks(el) {
         <div class="bank-header" onclick="toggleBank(${bank.id})">
           ${icon}
           <div class="bank-name">${bank.name}</div>
-          <div>
-            <div class="bank-phone">${bank.phone || ''}</div>
-          </div>
+          <div><div class="bank-phone">${bank.phone || ''}</div></div>
           <span class="chevron">▾</span>
         </div>
         <div class="rates-table">
@@ -387,7 +418,7 @@ function renderBanks(el) {
       </div>`;
   });
 
-  el.innerHTML = html || '<div class="empty">لا توجد نتائج مطابقة</div>';
+  el.innerHTML = html || '<div class="empty">لا توجد بيانات</div>';
 }
 
 function toggleBank(id) {
