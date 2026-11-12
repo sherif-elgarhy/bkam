@@ -202,6 +202,24 @@
 
     @keyframes spin-once { to { transform: rotate(360deg); } }
     .spinning { animation: spin-once 0.6s linear; }
+
+    .sort-btn {
+      padding: 4px 12px;
+      border-radius: 14px;
+      border: 1.5px solid #1a6b3c;
+      background: white;
+      color: #1a6b3c;
+      font-size: 0.78rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .sort-btn.active { background: #1a6b3c; color: white; }
+
+    .stale-badge {
+      font-size: 0.65rem;
+      color: #aaa;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -225,6 +243,14 @@
     <option value="">— كل العملات —</option>
   </select>
 </div>
+<div id="sort-bar" style="display:none;padding:8px 16px;background:#f8faf9;border-bottom:1px solid #e8e8e8;display:none;gap:8px;align-items:center;flex-wrap:wrap">
+  <span style="font-size:0.8rem;color:#666">ترتيب:</span>
+  <button class="sort-btn active" onclick="setSort('default',this)">افتراضي</button>
+  <button class="sort-btn" onclick="setSort('buy_asc',this)">شراء ↑</button>
+  <button class="sort-btn" onclick="setSort('buy_desc',this)">شراء ↓</button>
+  <button class="sort-btn" onclick="setSort('name',this)">الاسم</button>
+  <button class="sort-btn" onclick="setSort('updated',this)">الأحدث</button>
+</div>
 
 <div id="content">
   <div class="loading"><div class="spinner"></div>جارٍ تحميل البيانات...</div>
@@ -235,6 +261,29 @@ const DB = 'https://exchange-rates-project.firebaseio.com';
 let allData = {};
 let currentPage = 'banks';
 let currencyFilter = '';
+let sortMode = 'default';
+const STALE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
+function isStale(updatedMs) {
+  return !updatedMs || (Date.now() - updatedMs) > STALE_MS;
+}
+
+function bankLastUpdated(bankId) {
+  const { prices, currMap } = allData;
+  let latest = 0;
+  Object.keys(currMap).forEach(cid => {
+    const p = prices?.[parseInt(cid)]?.[bankId];
+    if (p?.updated > latest) latest = p.updated;
+  });
+  return latest;
+}
+
+function setSort(mode, btn) {
+  sortMode = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPage();
+}
 
 async function fetchJSON(url) {
   const r = await fetch(url);
@@ -291,13 +340,22 @@ function showPage(page, btn) {
   btn.classList.add('active');
   document.getElementById('filter-bar').style.display = page === 'banks' ? '' : 'none';
   currencyFilter = '';
+  sortMode = 'default';
   document.getElementById('currency-select').value = '';
+  document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  updateSortBar();
   renderPage();
 }
 
 function filterCurrencies(val) {
   currencyFilter = val;
+  updateSortBar();
   renderPage();
+}
+
+function updateSortBar() {
+  const bar = document.getElementById('sort-bar');
+  bar.style.display = (currentPage === 'banks' && currencyFilter) ? 'flex' : 'none';
 }
 
 function renderPage() {
@@ -309,6 +367,15 @@ function renderPage() {
   if (currentPage === 'banks') renderBanks(el);
   else if (currentPage === 'gold') renderGold(el, allData.gold);
   else if (currentPage === 'silver') renderSilver(el, allData.silver);
+}
+
+function relativeTime(ms) {
+  const days = Math.floor((Date.now() - ms) / 86400000);
+  if (days === 0) return 'اليوم';
+  if (days === 1) return 'أمس';
+  if (days < 7) return `منذ ${days} أيام`;
+  if (days < 30) return `منذ ${Math.floor(days/7)} أسابيع`;
+  return `منذ ${Math.floor(days/30)} شهور`;
 }
 
 function dirIcon(d) {
@@ -329,22 +396,40 @@ function renderBanks(el) {
     return;
   }
 
-  // Single currency selected → flat table of all banks
+  // Single currency selected → flat sorted table of all active banks
   if (currencyFilter) {
     const curr = currMap[currencyFilter];
     if (!curr) { el.innerHTML = '<div class="empty">عملة غير موجودة</div>'; return; }
     const currPrices = prices?.[parseInt(currencyFilter)];
 
-    let rows = '';
+    let entries = [];
     bankList.forEach(bank => {
       const p = currPrices?.[bank.id];
       if (!p) return;
+      if (isStale(p.updated)) return; // skip dead banks
+      entries.push({ bank, p });
+    });
+
+    // Sort
+    if (sortMode === 'buy_asc')  entries.sort((a,b) => parseFloat(a.p.buy_price) - parseFloat(b.p.buy_price));
+    if (sortMode === 'buy_desc') entries.sort((a,b) => parseFloat(b.p.buy_price) - parseFloat(a.p.buy_price));
+    if (sortMode === 'name')     entries.sort((a,b) => a.bank.name.localeCompare(b.bank.name, 'ar'));
+    if (sortMode === 'updated')  entries.sort((a,b) => b.p.updated - a.p.updated);
+
+    const rows = entries.map(({ bank, p }) => {
       const icon = bank.icon
         ? `<img src="${bank.icon}" alt="" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-left:8px;" onerror="this.style.display='none'">`
         : '';
-      rows += `
+      const ago = p.updated ? relativeTime(p.updated) : '';
+      return `
         <div class="rate-row">
-          <div style="display:flex;align-items:center">${icon}<span class="currency-name">${bank.name}</span></div>
+          <div style="display:flex;align-items:center">
+            ${icon}
+            <div>
+              <span class="currency-name">${bank.name}</span>
+              ${ago ? `<span class="stale-badge">${ago}</span>` : ''}
+            </div>
+          </div>
           <div class="price-cell">
             <span class="price-val">${p.buy_price?.toString().trim()}</span>
             ${dirIcon(p.buy_direction)}
@@ -354,7 +439,7 @@ function renderBanks(el) {
             ${dirIcon(p.sell_direction)}
           </div>
         </div>`;
-    });
+    }).join('');
 
     el.innerHTML = rows
       ? `<div class="bank-card">
@@ -377,7 +462,7 @@ function renderBanks(el) {
 
     Object.entries(currMap).forEach(([cid, curr]) => {
       const p = prices?.[parseInt(cid)]?.[bank.id];
-      if (!p) return;
+      if (!p || isStale(p.updated)) return;
       visibleCount++;
       rows += `
         <div class="rate-row">
