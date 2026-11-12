@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a6b3c">
+  <title>بكام في البنك؟</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #f0f4f1;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a6b3c, #2d9e5f);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    header h1 { font-size: 1.3rem; font-weight: 700; }
+    header p { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+
+    #last-updated {
+      font-size: 0.7rem;
+      opacity: 0.75;
+      text-align: left;
+    }
+
+    nav {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      overflow-x: auto;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+
+    .nav-btn {
+      white-space: nowrap;
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1.5px solid #1a6b3c;
+      background: white;
+      color: #1a6b3c;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .nav-btn.active {
+      background: #1a6b3c;
+      color: white;
+    }
+
+    .currency-filter {
+      padding: 10px 16px;
+      background: white;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .currency-filter input {
+      width: 100%;
+      padding: 9px 14px;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      direction: rtl;
+    }
+    .currency-filter input:focus { outline: none; border-color: #1a6b3c; }
+
+    #content { padding: 12px 16px; max-width: 700px; margin: 0 auto; }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #1a6b3c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .bank-card {
+      background: white;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .bank-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .bank-header img {
+      width: 40px; height: 40px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #f5f5f5;
+    }
+    .bank-name { font-weight: 600; font-size: 1rem; flex: 1; }
+    .bank-phone { font-size: 0.75rem; color: #888; direction: ltr; }
+    .chevron {
+      color: #aaa;
+      transition: transform 0.25s;
+      font-size: 1.2rem;
+    }
+    .bank-card.open .chevron { transform: rotate(180deg); }
+
+    .rates-table {
+      display: none;
+      border-top: 1px solid #f0f0f0;
+    }
+    .bank-card.open .rates-table { display: block; }
+
+    .rate-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 10px 16px;
+      border-bottom: 1px solid #f5f5f5;
+      align-items: center;
+    }
+    .rate-row:last-child { border-bottom: none; }
+    .rate-row.header {
+      background: #f8faf9;
+      font-size: 0.75rem;
+      color: #888;
+      font-weight: 600;
+      padding: 7px 16px;
+    }
+
+    .currency-name { font-size: 0.9rem; font-weight: 500; }
+    .currency-code { font-size: 0.72rem; color: #aaa; }
+
+    .price-cell { text-align: center; }
+    .price-val { font-size: 0.95rem; font-weight: 600; }
+    .dir-up { color: #16a34a; }
+    .dir-down { color: #dc2626; }
+    .dir-same { color: #666; }
+
+    /* Gold/Silver page */
+    .metal-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .metal-card h3 { font-size: 1rem; margin-bottom: 12px; color: #555; }
+    .metal-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 0.95rem;
+    }
+    .metal-row:last-child { border-bottom: none; }
+    .metal-label { color: #666; }
+    .metal-val { font-weight: 600; }
+
+    .empty { text-align: center; padding: 40px; color: #aaa; font-size: 0.9rem; }
+
+    .refresh-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.3rem;
+      cursor: pointer;
+      opacity: 0.85;
+      padding: 4px;
+    }
+    .refresh-btn:active { opacity: 0.6; }
+
+    @keyframes spin-once { to { transform: rotate(360deg); } }
+    .spinning { animation: spin-once 0.6s linear; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>💰 بكام في البنك؟</h1>
+    <p id="last-updated">جارٍ التحميل...</p>
+  </div>
+  <button class="refresh-btn" onclick="refreshData(this)" title="تحديث">↻</button>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="showPage('banks', this)">البنوك</button>
+  <button class="nav-btn" onclick="showPage('gold', this)">الذهب</button>
+  <button class="nav-btn" onclick="showPage('silver', this)">الفضة</button>
+</nav>
+
+<div class="currency-filter" id="filter-bar">
+  <input type="text" id="currency-search" placeholder="ابحث عن عملة..." oninput="filterCurrencies(this.value)">
+</div>
+
+<div id="content">
+  <div class="loading"><div class="spinner"></div>جارٍ تحميل البيانات...</div>
+</div>
+
+<script>
+const DB = 'https://exchange-rates-project.firebaseio.com';
+let allData = {};
+let currentPage = 'banks';
+let currencyFilter = '';
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+async function loadAll() {
+  const [banks, currencies, prices, gold, silver] = await Promise.all([
+    fetchJSON(`${DB}/banks.json`),
+    fetchJSON(`${DB}/currencies.json`),
+    fetchJSON(`${DB}/currencies-prices.json`),
+    fetchJSON(`${DB}/gold-prices.json`),
+    fetchJSON(`${DB}/silver-prices.json`)
+  ]);
+
+  // Normalize currencies: pushId → {currencyId, currencyName, currencyCode}
+  const currMap = {};
+  if (currencies) {
+    Object.values(currencies).forEach(c => {
+      if (c && c.currencyId) currMap[c.currencyId] = c;
+    });
+  }
+
+  allData = { banks, currMap, prices, gold, silver };
+  renderPage();
+  updateTimestamp();
+}
+
+function updateTimestamp() {
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    'آخر تحديث: ' + now.toLocaleTimeString('ar-EG');
+}
+
+function showPage(page, btn) {
+  currentPage = page;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('filter-bar').style.display = page === 'banks' ? '' : 'none';
+  currencyFilter = '';
+  document.getElementById('currency-search').value = '';
+  renderPage();
+}
+
+function filterCurrencies(val) {
+  currencyFilter = val.trim();
+  renderPage();
+}
+
+function renderPage() {
+  const el = document.getElementById('content');
+  if (!allData.banks) {
+    el.innerHTML = '<div class="loading"><div class="spinner"></div>جارٍ التحميل...</div>';
+    return;
+  }
+  if (currentPage === 'banks') renderBanks(el);
+  else if (currentPage === 'gold') renderMetal(el, allData.gold, 'الذهب', '🏅');
+  else if (currentPage === 'silver') renderMetal(el, allData.silver, 'الفضة', '🥈');
+}
+
+function dirIcon(d) {
+  if (d === 1) return '<span class="dir-up">▲</span>';
+  if (d === -1) return '<span class="dir-down">▼</span>';
+  return '<span class="dir-same">—</span>';
+}
+
+function renderBanks(el) {
+  const { banks, currMap, prices } = allData;
+  const filter = currencyFilter.toLowerCase();
+
+  // Sort banks by id, skip hidden
+  const bankList = Object.entries(banks)
+    .map(([id, b]) => ({ id: parseInt(id), ...b }))
+    .filter(b => !b.hidden && !b.stop)
+    .sort((a, b) => a.id - b.id);
+
+  if (!bankList.length) {
+    el.innerHTML = '<div class="empty">لا توجد بيانات</div>';
+    return;
+  }
+
+  let html = '';
+  bankList.forEach(bank => {
+    const bankPrices = prices?.[bank.id];
+    if (!bankPrices) return;
+
+    // Build currency rows
+    let rows = '';
+    let visibleCount = 0;
+
+    Object.entries(currMap).forEach(([cid, curr]) => {
+      const p = bankPrices[parseInt(cid)];
+      if (!p) return;
+      if (filter && !curr.currencyName.includes(filter) && !curr.currencyCode.toLowerCase().includes(filter)) return;
+
+      visibleCount++;
+      rows += `
+        <div class="rate-row">
+          <div>
+            <div class="currency-name">${curr.currencyName}</div>
+            <div class="currency-code">${curr.currencyCode}</div>
+          </div>
+          <div class="price-cell">
+            <span class="price-val">${p.buy_price}</span>
+            ${dirIcon(p.buy_direction)}
+          </div>
+          <div class="price-cell">
+            <span class="price-val">${p.sell_price}</span>
+            ${dirIcon(p.sell_direction)}
+          </div>
+        </div>`;
+    });
+
+    if (!visibleCount) return;
+
+    const icon = bank.icon ? `<img src="${bank.icon}" alt="" onerror="this.style.display='none'">` : '';
+    html += `
+      <div class="bank-card" id="bank-${bank.id}">
+        <div class="bank-header" onclick="toggleBank(${bank.id})">
+          ${icon}
+          <div class="bank-name">${bank.name}</div>
+          <div>
+            <div class="bank-phone">${bank.phone || ''}</div>
+          </div>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="rates-table">
+          <div class="rate-row header">
+            <div>العملة</div>
+            <div style="text-align:center">شراء</div>
+            <div style="text-align:center">بيع</div>
+          </div>
+          ${rows}
+        </div>
+      </div>`;
+  });
+
+  el.innerHTML = html || '<div class="empty">لا توجد نتائج مطابقة</div>';
+}
+
+function toggleBank(id) {
+  document.getElementById(`bank-${id}`).classList.toggle('open');
+}
+
+function renderMetal(el, data, name, icon) {
+  if (!data) {
+    el.innerHTML = `<div class="empty">لا توجد بيانات ${name}</div>`;
+    return;
+  }
+
+  let html = '';
+  if (Array.isArray(data)) {
+    // array indexed by bank id
+    const { banks } = allData;
+    const bankList = Object.entries(banks)
+      .map(([id, b]) => ({ id: parseInt(id), ...b }))
+      .filter(b => !b.hidden && !b.stop)
+      .sort((a, b) => a.id - b.id);
+
+    bankList.forEach(bank => {
+      const d = data[bank.id];
+      if (!d) return;
+      html += `
+        <div class="metal-card">
+          <h3>${icon} ${bank.name}</h3>
+          ${d.buy_price ? `<div class="metal-row"><span class="metal-label">سعر الشراء</span><span class="metal-val">${d.buy_price} ${dirIcon(d.buy_direction)}</span></div>` : ''}
+          ${d.sell_price ? `<div class="metal-row"><span class="metal-label">سعر البيع</span><span class="metal-val">${d.sell_price} ${dirIcon(d.sell_direction)}</span></div>` : ''}
+        </div>`;
+    });
+  } else {
+    // object
+    Object.entries(data).forEach(([k, d]) => {
+      if (!d) return;
+      html += `
+        <div class="metal-card">
+          <h3>${icon} ${k}</h3>
+          ${d.buy_price ? `<div class="metal-row"><span class="metal-label">سعر الشراء</span><span class="metal-val">${d.buy_price}</span></div>` : ''}
+          ${d.sell_price ? `<div class="metal-row"><span class="metal-label">سعر البيع</span><span class="metal-val">${d.sell_price}</span></div>` : ''}
+        </div>`;
+    });
+  }
+
+  el.innerHTML = html || `<div class="empty">لا توجد بيانات ${name}</div>`;
+}
+
+async function refreshData(btn) {
+  btn.classList.add('spinning');
+  try { await loadAll(); } catch(e) {}
+  setTimeout(() => btn.classList.remove('spinning'), 600);
+}
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+loadAll().catch(e => {
+  document.getElementById('content').innerHTML =
+    `<div class="empty">فشل التحميل. تأكد من الاتصال بالإنترنت.</div>`;
+});
+</script>
+</body>
+</html>
