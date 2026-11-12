@@ -342,6 +342,7 @@ function showPage(page, btn) {
   document.getElementById('filter-bar').style.display = page === 'banks' ? '' : 'none';
   currencyFilter = '';
   sortMode = 'buy_desc';
+  if (page !== 'exchanges') window._exchangesRegion = '';
   document.getElementById('currency-select').value = '';
   document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   updateSortBar();
@@ -592,20 +593,16 @@ function renderSilver(el, data) {
 function renderExchanges(el, data) {
   if (!data) { el.innerHTML = '<div class="empty">لا توجد بيانات</div>'; return; }
 
+  window._exchangesData = data;
   const items = (Array.isArray(data) ? data : Object.values(data)).filter(Boolean);
-  const regions = ['الكل', ...new Set(items.map(x => x.region).filter(Boolean))].sort((a,b) =>
-    a === 'الكل' ? -1 : a.localeCompare(b, 'ar'));
+  const regions = [...new Set(items.map(x => x.region).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ar'));
 
-  // Store for filter
-  if (!el._region) el._region = 'الكل';
-
-  const filtered = el._region === 'الكل' ? items : items.filter(x => x.region === el._region);
+  const selectedRegion = window._exchangesRegion || '';
+  const filtered = selectedRegion ? items.filter(x => x.region === selectedRegion) : items;
   filtered.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
 
-  const regionTabs = regions.map(r => `
-    <button class="sort-btn ${r === el._region ? 'active' : ''}"
-      onclick="document.getElementById('content')._region='${r}';renderExchanges(document.getElementById('content'),window._exchangesData)"
-      style="margin:3px">${r}</button>`).join('');
+  const options = regions.map(r =>
+    `<option value="${r}" ${r === selectedRegion ? 'selected' : ''}>${r}</option>`).join('');
 
   const cards = filtered.map(x => {
     const mapUrl = x.latitutde && x.longitude
@@ -627,11 +624,15 @@ function renderExchanges(el, data) {
   }).join('');
 
   el.innerHTML = `
-    <div style="padding:4px 0 8px;display:flex;flex-wrap:wrap;gap:4px">${regionTabs}</div>
+    <div style="margin-bottom:10px">
+      <select onchange="window._exchangesRegion=this.value;renderExchanges(document.getElementById('content'),window._exchangesData)"
+        style="width:100%;padding:9px 14px;border:1.5px solid #ccc;border-radius:8px;font-size:0.9rem;font-family:inherit;direction:rtl;background:white;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22%3E%3Cpath d=%22M1 1l5 5 5-5%22 stroke=%22%231a6b3c%22 stroke-width=%221.5%22 fill=%22none%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:left 12px center">
+        <option value="">— كل المحافظات —</option>
+        ${options}
+      </select>
+    </div>
     <div style="font-size:0.78rem;color:#888;margin-bottom:8px">${filtered.length} مكتب</div>
     ${cards || '<div class="empty">لا توجد نتائج</div>'}`;
-
-  window._exchangesData = data;
 }
 
 async function refreshData(btn) {
