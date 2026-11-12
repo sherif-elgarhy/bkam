@@ -320,9 +320,9 @@ function dirIcon(d) {
 function renderBanks(el) {
   const { banks, currMap, prices } = allData;
 
-  // Sort all banks by id
-  const bankList = Object.entries(banks)
-    .map(([id, b]) => ({ id: parseInt(id), ...b }))
+  // banks is an array; each item has an internal .id field (not the array index)
+  const bankList = (Array.isArray(banks) ? banks : Object.values(banks))
+    .filter(Boolean)
     .sort((a, b) => a.id - b.id);
 
   if (!bankList.length) {
@@ -330,6 +330,7 @@ function renderBanks(el) {
     return;
   }
 
+  // prices[currencyId][bankId]
   // Which currencies to show
   const filteredCurrencies = currencyFilter
     ? Object.entries(currMap).filter(([cid]) => cid === currencyFilter)
@@ -337,14 +338,12 @@ function renderBanks(el) {
 
   let html = '';
   bankList.forEach(bank => {
-    const bankPrices = prices?.[bank.id];
-    if (!bankPrices) return;
-
     let rows = '';
     let visibleCount = 0;
 
     filteredCurrencies.forEach(([cid, curr]) => {
-      const p = bankPrices[parseInt(cid)];
+      const currPrices = prices?.[parseInt(cid)];
+      const p = currPrices?.[bank.id];
       if (!p) return;
       visibleCount++;
       rows += `
@@ -354,11 +353,11 @@ function renderBanks(el) {
             <div class="currency-code">${curr.currencyCode}</div>
           </div>
           <div class="price-cell">
-            <span class="price-val">${p.buy_price}</span>
+            <span class="price-val">${p.buy_price?.toString().trim()}</span>
             ${dirIcon(p.buy_direction)}
           </div>
           <div class="price-cell">
-            <span class="price-val">${p.sell_price}</span>
+            <span class="price-val">${p.sell_price?.toString().trim()}</span>
             ${dirIcon(p.sell_direction)}
           </div>
         </div>`;
@@ -403,10 +402,9 @@ function renderMetal(el, data, name, icon) {
 
   let html = '';
   if (Array.isArray(data)) {
-    // array indexed by bank id
     const { banks } = allData;
-    const bankList = Object.entries(banks)
-      .map(([id, b]) => ({ id: parseInt(id), ...b }))
+    const bankList = (Array.isArray(banks) ? banks : Object.values(banks))
+      .filter(Boolean)
       .sort((a, b) => a.id - b.id);
 
     bankList.forEach(bank => {
