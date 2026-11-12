@@ -307,8 +307,8 @@ function renderPage() {
     return;
   }
   if (currentPage === 'banks') renderBanks(el);
-  else if (currentPage === 'gold') renderMetal(el, allData.gold, 'الذهب', '🏅');
-  else if (currentPage === 'silver') renderMetal(el, allData.silver, 'الفضة', '🥈');
+  else if (currentPage === 'gold') renderGold(el, allData.gold);
+  else if (currentPage === 'silver') renderSilver(el, allData.silver);
 }
 
 function dirIcon(d) {
@@ -425,43 +425,79 @@ function toggleBank(id) {
   document.getElementById(`bank-${id}`).classList.toggle('open');
 }
 
-function renderMetal(el, data, name, icon) {
-  if (!data) {
-    el.innerHTML = `<div class="empty">لا توجد بيانات ${name}</div>`;
-    return;
-  }
+function renderGold(el, data) {
+  if (!data) { el.innerHTML = '<div class="empty">لا توجد بيانات الذهب</div>'; return; }
 
-  let html = '';
-  if (Array.isArray(data)) {
-    const { banks } = allData;
-    const bankList = (Array.isArray(banks) ? banks : Object.values(banks))
-      .filter(Boolean)
-      .sort((a, b) => a.id - b.id);
+  const karats = ['9','12','14','18','21','22','24'];
+  const updated = data.updated ? new Date(data.updated).toLocaleString('ar-EG') : '';
 
-    bankList.forEach(bank => {
-      const d = data[bank.id];
-      if (!d) return;
-      html += `
-        <div class="metal-card">
-          <h3>${icon} ${bank.name}</h3>
-          ${d.buy_price ? `<div class="metal-row"><span class="metal-label">سعر الشراء</span><span class="metal-val">${d.buy_price} ${dirIcon(d.buy_direction)}</span></div>` : ''}
-          ${d.sell_price ? `<div class="metal-row"><span class="metal-label">سعر البيع</span><span class="metal-val">${d.sell_price} ${dirIcon(d.sell_direction)}</span></div>` : ''}
-        </div>`;
-    });
-  } else {
-    // object
-    Object.entries(data).forEach(([k, d]) => {
-      if (!d) return;
-      html += `
-        <div class="metal-card">
-          <h3>${icon} ${k}</h3>
-          ${d.buy_price ? `<div class="metal-row"><span class="metal-label">سعر الشراء</span><span class="metal-val">${d.buy_price}</span></div>` : ''}
-          ${d.sell_price ? `<div class="metal-row"><span class="metal-label">سعر البيع</span><span class="metal-val">${d.sell_price}</span></div>` : ''}
-        </div>`;
-    });
-  }
+  let rows = karats.map(k => {
+    const egp = data[k], usd = data[`${k}-usd`];
+    if (!egp) return '';
+    return `<div class="rate-row">
+      <div><div class="currency-name">عيار ${k}</div></div>
+      <div class="price-cell"><span class="price-val">${egp.toLocaleString()} ج.م</span></div>
+      <div class="price-cell"><span class="price-val">${usd ? '$' + usd : '—'}</span></div>
+    </div>`;
+  }).join('');
 
-  el.innerHTML = html || `<div class="empty">لا توجد بيانات ${name}</div>`;
+  const extras = [
+    ['الجرام (أعلى عيار)', data.kg ? (data.kg/1000).toLocaleString() + ' ج.م' : null, data['kg-usd'] ? '$' + (data['kg-usd']/1000).toFixed(2) : null],
+    ['الأوقية', data.ounce ? data.ounce.toLocaleString() + ' ج.م' : null, data['ounce-usd'] ? '$' + data['ounce-usd'] : null],
+    ['الجنيه الذهب', data.pound ? data.pound.toLocaleString() + ' ج.م' : null, data['pound-usd'] ? '$' + data['pound-usd'] : null],
+  ].filter(r => r[1]);
+
+  const extraRows = extras.map(([label, egp, usd]) => `
+    <div class="rate-row">
+      <div><div class="currency-name">${label}</div></div>
+      <div class="price-cell"><span class="price-val">${egp}</span></div>
+      <div class="price-cell"><span class="price-val">${usd || '—'}</span></div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="bank-card">
+      <div class="rate-row header">
+        <div>🏅 الذهب</div>
+        <div style="text-align:center">جنيه مصري</div>
+        <div style="text-align:center">دولار</div>
+      </div>
+      ${rows}${extraRows}
+    </div>
+    ${updated ? `<div style="text-align:center;color:#aaa;font-size:0.75rem;padding:8px">آخر تحديث: ${updated}</div>` : ''}`;
+}
+
+function renderSilver(el, data) {
+  if (!data) { el.innerHTML = '<div class="empty">لا توجد بيانات الفضة</div>'; return; }
+
+  const purities = ['80','90','92','95','99'];
+  const updated = data.updated ? new Date(data.updated).toLocaleString('ar-EG') : '';
+
+  let rows = purities.map(p => {
+    const egp = data[p], usd = data[`${p}_usd`];
+    if (!egp) return '';
+    return `<div class="rate-row">
+      <div><div class="currency-name">فضة ${p}%</div></div>
+      <div class="price-cell"><span class="price-val">${egp} ج.م</span></div>
+      <div class="price-cell"><span class="price-val">${usd ? '$' + usd : '—'}</span></div>
+    </div>`;
+  }).join('');
+
+  const ounce = data.ounce ? `<div class="rate-row">
+    <div><div class="currency-name">الأوقية</div></div>
+    <div class="price-cell"><span class="price-val">${parseFloat(data.ounce).toLocaleString()} ج.م</span></div>
+    <div class="price-cell"><span class="price-val">${data.ounce_usd ? '$' + data.ounce_usd : '—'}</span></div>
+  </div>` : '';
+
+  el.innerHTML = `
+    <div class="bank-card">
+      <div class="rate-row header">
+        <div>🥈 الفضة</div>
+        <div style="text-align:center">جنيه مصري</div>
+        <div style="text-align:center">دولار</div>
+      </div>
+      ${rows}${ounce}
+    </div>
+    ${updated ? `<div style="text-align:center;color:#aaa;font-size:0.75rem;padding:8px">آخر تحديث: ${updated}</div>` : ''}`;
 }
 
 async function refreshData(btn) {
