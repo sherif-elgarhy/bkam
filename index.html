@@ -72,7 +72,7 @@
       background: white;
       border-bottom: 1px solid #e8e8e8;
     }
-    .currency-filter input {
+    .currency-filter select {
       width: 100%;
       padding: 9px 14px;
       border: 1.5px solid #ccc;
@@ -80,8 +80,14 @@
       font-size: 0.9rem;
       font-family: inherit;
       direction: rtl;
+      background: white;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231a6b3c' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: left 12px center;
+      cursor: pointer;
     }
-    .currency-filter input:focus { outline: none; border-color: #1a6b3c; }
+    .currency-filter select:focus { outline: none; border-color: #1a6b3c; }
 
     #content { padding: 12px 16px; max-width: 700px; margin: 0 auto; }
 
@@ -215,7 +221,9 @@
 </nav>
 
 <div class="currency-filter" id="filter-bar">
-  <input type="text" id="currency-search" placeholder="ابحث عن عملة..." oninput="filterCurrencies(this.value)">
+  <select id="currency-select" onchange="filterCurrencies(this.value)">
+    <option value="">— كل العملات —</option>
+  </select>
 </div>
 
 <div id="content">
@@ -251,6 +259,7 @@ async function loadAll() {
   }
 
   allData = { banks, currMap, prices, gold, silver };
+  populateCurrencySelect(currMap);
   renderPage();
   updateTimestamp();
 }
@@ -261,18 +270,33 @@ function updateTimestamp() {
     'آخر تحديث: ' + now.toLocaleTimeString('ar-EG');
 }
 
+function populateCurrencySelect(currMap) {
+  const sel = document.getElementById('currency-select');
+  const current = sel.value;
+  // keep the first "all" option, remove the rest
+  while (sel.options.length > 1) sel.remove(1);
+  const sorted = Object.values(currMap).sort((a, b) => a.currencyName.localeCompare(b.currencyName, 'ar'));
+  sorted.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.currencyId;
+    opt.textContent = `${c.currencyName} (${c.currencyCode})`;
+    sel.appendChild(opt);
+  });
+  sel.value = current || '';
+}
+
 function showPage(page, btn) {
   currentPage = page;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('filter-bar').style.display = page === 'banks' ? '' : 'none';
   currencyFilter = '';
-  document.getElementById('currency-search').value = '';
+  document.getElementById('currency-select').value = '';
   renderPage();
 }
 
 function filterCurrencies(val) {
-  currencyFilter = val.trim();
+  currencyFilter = val;
   renderPage();
 }
 
@@ -295,12 +319,10 @@ function dirIcon(d) {
 
 function renderBanks(el) {
   const { banks, currMap, prices } = allData;
-  const filter = currencyFilter.toLowerCase();
 
-  // Sort banks by id, skip hidden
+  // Sort all banks by id
   const bankList = Object.entries(banks)
     .map(([id, b]) => ({ id: parseInt(id), ...b }))
-    .filter(b => !b.hidden && !b.stop)
     .sort((a, b) => a.id - b.id);
 
   if (!bankList.length) {
@@ -308,20 +330,22 @@ function renderBanks(el) {
     return;
   }
 
+  // Which currencies to show
+  const filteredCurrencies = currencyFilter
+    ? Object.entries(currMap).filter(([cid]) => cid === currencyFilter)
+    : Object.entries(currMap);
+
   let html = '';
   bankList.forEach(bank => {
     const bankPrices = prices?.[bank.id];
     if (!bankPrices) return;
 
-    // Build currency rows
     let rows = '';
     let visibleCount = 0;
 
-    Object.entries(currMap).forEach(([cid, curr]) => {
+    filteredCurrencies.forEach(([cid, curr]) => {
       const p = bankPrices[parseInt(cid)];
       if (!p) return;
-      if (filter && !curr.currencyName.includes(filter) && !curr.currencyCode.toLowerCase().includes(filter)) return;
-
       visibleCount++;
       rows += `
         <div class="rate-row">
@@ -383,7 +407,6 @@ function renderMetal(el, data, name, icon) {
     const { banks } = allData;
     const bankList = Object.entries(banks)
       .map(([id, b]) => ({ id: parseInt(id), ...b }))
-      .filter(b => !b.hidden && !b.stop)
       .sort((a, b) => a.id - b.id);
 
     bankList.forEach(bank => {
