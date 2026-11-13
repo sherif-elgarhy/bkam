@@ -142,6 +142,46 @@
     }
     .bank-card.open .rates-table { display: block; }
 
+    /* flat currency-view table */
+    .flat-table { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .flat-row {
+      display: grid;
+      grid-template-columns: 1fr 90px 90px;
+      padding: 11px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      align-items: center;
+      min-height: 48px;
+    }
+    .flat-row:last-child { border-bottom: none; }
+    .flat-header {
+      background: #f8faf9;
+      padding: 7px 12px;
+      min-height: unset;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .flat-header .col-sort {
+      font-size: 0.78rem; font-weight: 700; color: #555;
+      cursor: pointer; user-select: none; text-align: center;
+      padding: 2px 4px; border-radius: 6px;
+    }
+    .flat-header .col-sort.active { color: #1a6b3c; }
+    .bank-cell {
+      display: flex; align-items: center; gap: 8px;
+      overflow: hidden;
+    }
+    .bank-cell img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+    .bank-cell .bname {
+      font-size: 0.82rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bank-cell .bdate { font-size: 0.65rem; color: #bbb; }
+    .price-col { text-align: center; }
+    .price-val { font-size: 1.05rem; font-weight: 700; }
+    .dir-up { color: #16a34a; font-size: 0.7rem; }
+    .dir-down { color: #dc2626; font-size: 0.7rem; }
+    .dir-same { color: #aaa; font-size: 0.7rem; }
+
+    /* accordion table (all currencies view) */
     .rate-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -152,20 +192,44 @@
     .rate-row:last-child { border-bottom: none; }
     .rate-row.header {
       background: #f8faf9;
-      font-size: 0.75rem;
-      color: #888;
-      font-weight: 600;
+      font-size: 0.75rem; color: #888; font-weight: 600;
       padding: 7px 16px;
     }
-
     .currency-name { font-size: 0.9rem; font-weight: 500; }
     .currency-code { font-size: 0.72rem; color: #aaa; }
-
     .price-cell { text-align: center; }
-    .price-val { font-size: 0.95rem; font-weight: 600; }
-    .dir-up { color: #16a34a; }
-    .dir-down { color: #dc2626; }
-    .dir-same { color: #666; }
+
+    /* currency bottom sheet */
+    .sheet-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 200;
+      align-items: flex-end;
+    }
+    .sheet-overlay.open { display: flex; }
+    .sheet {
+      background: white; width: 100%; max-height: 75vh;
+      border-radius: 16px 16px 0 0;
+      display: flex; flex-direction: column;
+    }
+    .sheet-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .sheet-header h3 { flex: 1; font-size: 1.1rem; font-weight: 700; }
+    .sheet-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888; }
+    .sheet-list { overflow-y: auto; flex: 1; }
+    .sheet-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 20px;
+      border-bottom: 1px solid #f5f5f5;
+      cursor: pointer;
+    }
+    .sheet-item:active { background: #f0f9f4; }
+    .sheet-item.selected { background: #f0f9f4; }
+    .sheet-item .flag { font-size: 1.5rem; }
+    .sheet-item .cname { flex: 1; font-size: 0.95rem; font-weight: 500; }
+    .sheet-item .ccode { font-size: 0.82rem; color: #2d9e5f; font-weight: 700; }
 
     /* Gold/Silver page */
     .metal-card {
@@ -203,23 +267,7 @@
     @keyframes spin-once { to { transform: rotate(360deg); } }
     .spinning { animation: spin-once 0.6s linear; }
 
-    .sort-btn {
-      padding: 4px 12px;
-      border-radius: 14px;
-      border: 1.5px solid #1a6b3c;
-      background: white;
-      color: #1a6b3c;
-      font-size: 0.78rem;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .sort-btn.active { background: #1a6b3c; color: white; }
-
-    .stale-badge {
-      font-size: 0.65rem;
-      color: #aaa;
-      display: block;
-    }
+    .stale-badge { font-size: 0.65rem; color: #bbb; display: block; }
   </style>
 </head>
 <body>
@@ -240,16 +288,23 @@
 </nav>
 
 <div class="currency-filter" id="filter-bar">
-  <select id="currency-select" onchange="filterCurrencies(this.value)">
-    <option value="">— كل العملات —</option>
-  </select>
+  <button id="currency-btn" onclick="openSheet()"
+    style="width:100%;padding:10px 14px;border:1.5px solid #ccc;border-radius:8px;font-size:0.95rem;font-family:inherit;direction:rtl;background:white;text-align:right;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+    <span id="currency-btn-label">— كل العملات —</span>
+    <span style="color:#1a6b3c;font-size:0.8rem">▾</span>
+  </button>
 </div>
-<div id="sort-bar" style="display:none;padding:8px 16px;background:#f8faf9;border-bottom:1px solid #e8e8e8;gap:8px;align-items:center;flex-wrap:wrap">
-  <span style="font-size:0.8rem;color:#666">ترتيب:</span>
-  <button class="sort-btn active" onclick="setSort('buy_desc',this)">شراء أعلى</button>
-  <button class="sort-btn" onclick="setSort('buy_asc',this)">شراء أدنى</button>
-  <button class="sort-btn" onclick="setSort('sell_desc',this)">بيع أعلى</button>
-  <button class="sort-btn" onclick="setSort('sell_asc',this)">بيع أدنى</button>
+
+<!-- Currency bottom sheet -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet(event)">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span style="font-size:1.5rem">💱</span>
+      <h3>إختر العملة</h3>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-list" id="sheet-list"></div>
+  </div>
 </div>
 
 <div id="content">
@@ -278,10 +333,8 @@ function bankLastUpdated(bankId) {
   return latest;
 }
 
-function setSort(mode, btn) {
+function setSort(mode) {
   sortMode = mode;
-  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
   renderPage();
 }
 
@@ -320,19 +373,49 @@ function updateTimestamp() {
     'آخر تحديث: ' + now.toLocaleTimeString('ar-EG');
 }
 
+const CURRENCY_FLAGS = {
+  USD:'🇺🇸',EUR:'🇪🇺',GBP:'🇬🇧',SAR:'🇸🇦',KWD:'🇰🇼',AED:'🇦🇪',
+  CHF:'🇨🇭',CAD:'🇨🇦',DKK:'🇩🇰',NOK:'🇳🇴',SEK:'🇸🇪',JPY:'🇯🇵',
+  AUD:'🇦🇺',BHD:'🇧🇭',BAD:'🇧🇭',OMR:'🇴🇲',QAR:'🇶🇦',QTR:'🇶🇦',
+  JOD:'🇯🇴',CNY:'🇨🇳',EGP:'🇪🇬'
+};
+
 function populateCurrencySelect(currMap) {
-  const sel = document.getElementById('currency-select');
-  const current = sel.value;
-  // keep the first "all" option, remove the rest
-  while (sel.options.length > 1) sel.remove(1);
-  const sorted = Object.values(currMap).sort((a, b) => a.currencyName.localeCompare(b.currencyName, 'ar'));
+  const list = document.getElementById('sheet-list');
+  const sorted = Object.values(currMap).sort((a,b) => a.currencyName.localeCompare(b.currencyName, 'ar'));
+
+  // "all" option
+  let html = `<div class="sheet-item ${!currencyFilter ? 'selected' : ''}" onclick="selectCurrency('','— كل العملات —')">
+    <span class="flag">🏦</span>
+    <span class="cname">كل العملات</span>
+  </div>`;
+
   sorted.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.currencyId;
-    opt.textContent = `${c.currencyName} (${c.currencyCode})`;
-    sel.appendChild(opt);
+    const flag = CURRENCY_FLAGS[c.currencyCode] || '💵';
+    html += `<div class="sheet-item ${currencyFilter===c.currencyId ? 'selected' : ''}"
+      onclick="selectCurrency('${c.currencyId}','${flag} ${c.currencyName}')">
+      <span class="flag">${flag}</span>
+      <span class="cname">${c.currencyName}</span>
+      <span class="ccode">${c.currencyCode}</span>
+    </div>`;
   });
-  sel.value = current || '';
+  list.innerHTML = html;
+}
+
+function openSheet() {
+  document.getElementById('sheet-overlay').classList.add('open');
+}
+function closeSheet(e) {
+  if (!e || e.target === document.getElementById('sheet-overlay'))
+    document.getElementById('sheet-overlay').classList.remove('open');
+}
+function selectCurrency(id, label) {
+  currencyFilter = id;
+  sortMode = 'buy_desc';
+  document.getElementById('currency-btn-label').textContent = label;
+  document.getElementById('sheet-overlay').classList.remove('open');
+  populateCurrencySelect(allData.currMap);
+  renderPage();
 }
 
 function showPage(page, btn) {
@@ -343,23 +426,9 @@ function showPage(page, btn) {
   currencyFilter = '';
   sortMode = 'buy_desc';
   if (page !== 'exchanges') window._exchangesRegion = '';
-  document.getElementById('currency-select').value = '';
-  document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
-  updateSortBar();
+  document.getElementById('currency-btn-label').textContent = '— كل العملات —';
+  if (allData.currMap) populateCurrencySelect(allData.currMap);
   renderPage();
-}
-
-function filterCurrencies(val) {
-  currencyFilter = val;
-  sortMode = 'buy_desc';
-  document.querySelectorAll('.sort-btn').forEach((b,i) => b.classList.toggle('active', i===0));
-  updateSortBar();
-  renderPage();
-}
-
-function updateSortBar() {
-  const bar = document.getElementById('sort-bar');
-  bar.style.display = (currentPage === 'banks' && currencyFilter) ? 'flex' : 'none';
 }
 
 function renderPage() {
@@ -423,35 +492,46 @@ function renderBanks(el) {
 
     const rows = entries.map(({ bank, p }) => {
       const icon = bank.icon
-        ? `<img src="${bank.icon}" alt="" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-left:8px;" onerror="this.style.display='none'">`
-        : '';
+        ? `<img src="${bank.icon}" alt="" onerror="this.style.display='none'">`
+        : `<div style="width:32px;height:32px;border-radius:6px;background:#e8f5ee;flex-shrink:0"></div>`;
       const ago = p.updated ? relativeTime(p.updated) : '';
       return `
-        <div class="rate-row">
-          <div style="display:flex;align-items:center">
+        <div class="flat-row">
+          <div class="bank-cell">
             ${icon}
-            <div>
-              <span class="currency-name">${bank.name}</span>
-              ${ago ? `<span class="stale-badge">${ago}</span>` : ''}
+            <div style="overflow:hidden">
+              <div class="bname">${bank.name}</div>
+              ${ago ? `<div class="bdate">${ago}</div>` : ''}
             </div>
           </div>
-          <div class="price-cell">
+          <div class="price-col">
             <span class="price-val">${p.buy_price?.toString().trim()}</span>
             ${dirIcon(p.buy_direction)}
           </div>
-          <div class="price-cell">
+          <div class="price-col">
             <span class="price-val">${p.sell_price?.toString().trim()}</span>
             ${dirIcon(p.sell_direction)}
           </div>
         </div>`;
     }).join('');
 
+    const buyAscActive  = sortMode === 'buy_asc'  ? 'active' : '';
+    const buyDescActive = sortMode === 'buy_desc' ? 'active' : '';
+    const selAscActive  = sortMode === 'sell_asc' ? 'active' : '';
+    const selDescActive = sortMode === 'sell_desc'? 'active' : '';
+
     el.innerHTML = rows
-      ? `<div class="bank-card">
-           <div class="rate-row header">
-             <div>البنك</div>
-             <div style="text-align:center">شراء</div>
-             <div style="text-align:center">بيع</div>
+      ? `<div class="flat-table">
+           <div class="flat-row flat-header">
+             <div style="font-size:0.78rem;font-weight:700;color:#555">البنك</div>
+             <div class="price-col">
+               <span class="col-sort ${buyDescActive}" onclick="setSort('buy_desc')">شراء ▼</span>
+               <span class="col-sort ${buyAscActive}"  onclick="setSort('buy_asc')">▲</span>
+             </div>
+             <div class="price-col">
+               <span class="col-sort ${selDescActive}" onclick="setSort('sell_desc')">بيع ▼</span>
+               <span class="col-sort ${selAscActive}"  onclick="setSort('sell_asc')">▲</span>
+             </div>
            </div>
            ${rows}
          </div>`
