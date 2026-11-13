@@ -1,5 +1,5 @@
-const CACHE = 'bkam-v1';
-const STATIC = ['/', '/index.html', '/manifest.json'];
+const CACHE = 'bkam-v2';
+const STATIC = ['/bkam/', '/bkam/index.html', '/bkam/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
